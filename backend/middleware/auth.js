@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// ✅ Protect Route Middleware (General)
 const protect = async (req, res, next) => {
   let token;
 
@@ -19,15 +18,21 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ error: "User not found" });
       }
 
-      next(); // Allow the request to continue
+      next();
     } catch (error) {
-      console.error("❌ [AUTH ERROR]:", error);
-      return res.status(401).json({ error: "Not authorized, token failed" });
+      if (error.name === "TokenExpiredError") {
+        console.error("❌ [AUTH ERROR]: Token expired");
+        return res.status(401).json({ error: "Token expired, please login again" });
+      } else {
+        console.error("❌ [AUTH ERROR]:", error);
+        return res.status(401).json({ error: "Not authorized, token failed" });
+      }
     }
   } else {
     return res.status(401).json({ error: "Not authorized, no token" });
   }
 };
+
 
 // ✅ Admin Route Middleware
 const admin = (req, res, next) => {
@@ -49,7 +54,7 @@ const user = (req, res, next) => {
 
 // ✅ Token Generator
 const generateToken = (id, role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
 module.exports = { protect, admin, user, generateToken };

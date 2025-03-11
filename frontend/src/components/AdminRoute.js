@@ -1,10 +1,15 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const AdminRoute = () => {
-  const { user } = useAuth();
+const AdminRoute = ({ component: Component }) => {
+  const { isAuthenticated, user } = useAuth();
 
-  return user && user.role === "admin" ? <Outlet /> : <Navigate to="/login" />;
+  // ✅ Fix: Use existing isAdmin from context instead of re-declaring
+  if (isAuthenticated && user?.role === "admin") {
+    return <Component />;
+  } else {
+    return <Navigate to="/login" />;
+  }
 };
 
 export default AdminRoute;

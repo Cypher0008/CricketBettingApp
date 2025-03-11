@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 
@@ -18,33 +18,42 @@ import CreditRequestsPage from "./pages/CreditsRequestsPage";
 // ✅ Import Protected Route Handling
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import './index.css'
 
 function App() {
+  const { isAuthenticated, user } = useAuth();
+
   return (
     <AuthProvider>
       <Router>
+      <div className="app-container">
         <Header />
         <Routes>
           {/* ✅ Public Routes */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to="/home" /> : <Navigate to="/login" />} />
+          <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/home" />} />
+          <Route path="/register" element={!isAuthenticated ? <RegisterPage /> : <Navigate to="/home" />} />
 
           {/* ✅ User Routes (Protected) */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/home" element={<HomePage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/match/:id" element={<MatchDetailsPage />} />
+            <Route path="/match/:matchId" element={<MatchDetailsPage />} />
             <Route path="/betting/:matchId" element={<BettingPage />} />
             <Route path="/bets" element={<BetsPage />} />
           </Route>
 
           {/* ✅ Admin Routes */}
-          <Route element={<AdminRoute />}>
+        {isAuthenticated && user?.role === "admin" && (
+            <>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/credit-requests" element={<CreditRequestsPage />} />
-          </Route>
+            </>
+        )}
+
         </Routes>
+        </div>
         <Footer />
       </Router>
     </AuthProvider>

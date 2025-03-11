@@ -10,6 +10,28 @@ const { protect, generateToken , user} = require("../middleware/auth");
 require("dotenv").config();
 const router = express.Router();
 
+// ✅ Refresh Token
+router.post("/refresh-token", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+
+    const newToken = generateToken(user._id, user.role);
+    const newRefreshToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "30d" });
+
+    res.json({ token: newToken, refreshToken: newRefreshToken });
+  } catch (error) {
+    return res.status(401).json({ error: "Failed to refresh token" });
+  }
+});
+
+
 // ✅ User Registration
 router.post("/register", async (req, res) => {
   const { username, phone, password } = req.body;
@@ -51,11 +73,11 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ error: "Registration failed", details: error.message });
   }
 });
-
 // ✅ User Login
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
-
+     // ✅ Debugging: Check the format of incoming data
+  console.log("🔍 [DEBUG] Incoming Login Payload:", req.body);
   try {
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ error: "User not found" });
@@ -63,10 +85,27 @@ router.post("/login", async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Invalid password" });
 
+    // ✅ Include role in the token
     const token = generateToken(user._id, user.role);
+    const refreshToken = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    res.json({ message: "Login successful", token });
+    res.json({
+      message: "Login successful",
+      token,
+      refreshToken, // ✅ Include refresh token in response
+      user: {
+        username: user.username,
+        role: user.role,
+        phone: user.phone,
+        credits: user.credits,
+      },
+    });
   } catch (error) {
+    console.error("❌ [AUTH ERROR]:", error);
     res.status(500).json({ error: "Login failed" });
   }
 });

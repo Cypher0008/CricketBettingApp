@@ -1,0 +1,42 @@
+.scorecard {
+  margin-top: 20px;
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.team-scorecard h4 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+th, td {
+  padding: 10px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  background-color: #ffcc00;
+  color: #000;
+  font-weight: bold;
+}
+
+tr:hover {
+  background-color: #f9f9f9;
+}
+
+.loading, .error {
+  font-size: 16px;
+  color: #888;
+  text-align: center;
+  padding: 10px;
+}

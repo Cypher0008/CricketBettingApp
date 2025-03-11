@@ -1,44 +1,56 @@
-.login-container, .register-container {
-  max-width: 400px;
-  margin: 50px auto;
+.auth-page {
   padding: 20px;
-  background-color: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: center;
 }
 
-.login-container h2, .register-container h2 {
+.auth-form {
+  background-color: #2c2c2c;
+  padding: 20px;
+  border-radius: 10px;
+  color: #fff;
+  width: 300px;
+}
+
+.auth-form h2 {
   margin-bottom: 20px;
   text-align: center;
 }
 
-input, button {
-  display: block;
+.auth-form input {
   width: 100%;
-  padding: 12px;
-  margin-bottom: 12px;
-  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 5px;
   border: 1px solid #ccc;
+  background-color: #1f1f1f;
+  color: #fff;
 }
 
-button {
-  background-color: #28a745;
-  color: #ffffff;
-  font-weight: bold;
+.auth-form button {
+  width: 100%;
+  padding: 10px;
+  background-color: #ffcc00;
+  color: #1f1f1f;
+  border: none;
+  border-radius: 5px;
   cursor: pointer;
 }
 
-button:hover {
-  background-color: #218838;
+.auth-form button:hover {
+  background-color: #ffd633;
 }
 
-.error {
-  color: red;
+.auth-form p {
   text-align: center;
+  margin-top: 10px;
 }
 
-.success {
-  color: green;
-  text-align: center;
+.auth-form span {
+  color: #ffcc00;
+  cursor: pointer;
+}
+
+.auth-form span:hover {
+  text-decoration: underline;
 }

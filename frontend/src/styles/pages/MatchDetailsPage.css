@@ -1,0 +1,104 @@
+
+.match-details-container {
+  padding: 20px;
+  background-image: url('../../../public/cricket-bg.jpg'); /* Ensure path is correct */
+  background-size: cover;
+  background-position: center;
+  color: #333;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  max-width: 1000px;
+  margin: 20px auto;
+}
+
+.match-info h2 {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.match-info p {
+  font-size: 16px;
+  margin: 4px 0;
+}
+
+.tab-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.tab-container button {
+  padding: 10px 20px;
+  background-color: #e0e0e0;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.tab-container button.active {
+  background-color: #ffcc00;
+  color: #000;
+  font-weight: bold;
+}
+
+.scorecard-section,
+.commentary-section {
+  margin-top: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+th,
+td {
+  padding: 10px;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+
+th {
+  background-color: #ffcc00;
+  color: #000;
+  font-weight: bold;
+}
+
+td {
+  background-color: #f9f9f9;
+}
+
+.commentary-item {
+  padding: 10px;
+  background-color: #f1f1f1;
+  border: 1px solid #ddd;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .match-details-container {
+    padding: 10px;
+  }
+
+  th,
+  td {
+    font-size: 14px;
+    padding: 6px;
+  }
+
+  .tab-container {
+    flex-direction: column;
+  }
+
+  .tab-container button {
+    width: 100%;
+  }
+}
