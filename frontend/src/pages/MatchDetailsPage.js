@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import '../styles/pages/MatchDetailsPage.css';
@@ -36,7 +35,8 @@ const MatchDetailsPage = () => {
     return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
   };
 
-  const renderScorecard = (team, teamName) => (
+  // ✅ Render Batting Table
+  const renderBattingTable = (team, teamName) => (
     <div className="scorecard-section">
       <h3>{teamName} Batting</h3>
       <table>
@@ -66,7 +66,7 @@ const MatchDetailsPage = () => {
             ))
           ) : (
             <tr>
-              <td colSpan="7">No scorecard data available</td>
+              <td colSpan="7">No batting data available</td>
             </tr>
           )}
         </tbody>
@@ -74,6 +74,44 @@ const MatchDetailsPage = () => {
     </div>
   );
 
+  // ✅ Render Bowling Table (New)
+  const renderBowlingTable = (team, teamName) => (
+    <div className="scorecard-section">
+      <h3>{teamName} Bowling</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Overs</th>
+            <th>Maidens</th>
+            <th>Runs Conceded</th>
+            <th>Wickets</th>
+            <th>Economy</th>
+          </tr>
+        </thead>
+        <tbody>
+          {team?.length > 0 ? (
+            team.map((player, index) => (
+              <tr key={index}>
+                <td>{player.name || '-'}</td>
+                <td>{player.overs || '-'}</td>
+                <td>{player.maidens || '-'}</td>
+                <td>{player.runs_conceded || '-'}</td>
+                <td>{player.wickets || '-'}</td>
+                <td>{player.economy || '-'}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="6">No bowling data available</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // ✅ Render Commentary
   const renderCommentary = () => (
     <div className="commentary-section">
       {matchDetails.commentary?.length > 0 ? (
@@ -93,6 +131,7 @@ const MatchDetailsPage = () => {
 
   return (
     <div className="match-details-container">
+      {/* ✅ Match Info */}
       <div className="match-info">
         <h2>{matchDetails.home_team || '-'} vs {matchDetails.away_team || '-'}</h2>
         <p>📅 <strong>Date:</strong> {formatDate(matchDetails.scheduled)}</p>
@@ -102,6 +141,7 @@ const MatchDetailsPage = () => {
         <p>🥇 <strong>Winner:</strong> {matchDetails.match_winner || '-'}</p>
         <p>🏏 <strong>Score:</strong> {matchDetails.home_score || '-'} - {matchDetails.away_score || '-'}</p>
 
+        {/* ✅ Tabs */}
         <div className="tab-container">
           <button
             className={activeTab === 'scorecard' ? 'active' : ''}
@@ -118,13 +158,17 @@ const MatchDetailsPage = () => {
         </div>
       </div>
 
+      {/* ✅ Render Scorecard and Bowling */}
       {activeTab === 'scorecard' && (
         <>
-          {renderScorecard(matchDetails.batting_scorecard?.home_team, matchDetails.home_team)}
-          {renderScorecard(matchDetails.batting_scorecard?.away_team, matchDetails.away_team)}
+          {renderBattingTable(matchDetails.batting_scorecard?.home_team, matchDetails.home_team)}
+          {renderBowlingTable(matchDetails.bowling_scorecard?.home_team, matchDetails.home_team)}
+          {renderBattingTable(matchDetails.batting_scorecard?.away_team, matchDetails.away_team)}
+          {renderBowlingTable(matchDetails.bowling_scorecard?.away_team, matchDetails.away_team)}
         </>
       )}
-      
+
+      {/* ✅ Render Commentary */}
       {activeTab === 'commentary' && renderCommentary()}
     </div>
   );

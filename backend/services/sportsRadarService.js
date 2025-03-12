@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 const BASE_URL = "https://api.sportradar.com/cricket-t2/en";
-const API_KEY = "KVu4DgoyEWQX34IM54xsoVdeewLZrUIJloaXsEks";
+const API_KEY = "YtzgWaXRBBJ4vbjBbCP2U7IShSvkUNPMdYRyb1vZ";
 
 async function fetchMatches(date) {
     try {

@@ -1,42 +1,38 @@
 .scorecard {
-  margin-top: 20px;
-  background-color: #ffffff;
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.7); /* Slightly transparent background */
+  border-radius: 12px;
+  color: #fff;
 }
 
-.team-scorecard h4 {
-  font-size: 18px;
-  color: #333;
-  margin-bottom: 8px;
+.match-info h2 {
+  font-size: 22px;
+  color: #ffcc00;
+  margin-bottom: 10px;
 }
 
 table {
   width: 100%;
-  border-collapse: collapse;
   margin-bottom: 20px;
+  border-collapse: collapse;
+  background-color: rgba(255, 255, 255, 0.1); /* Add transparency */
 }
 
 th, td {
   padding: 10px;
+  border: 1px solid #444;
   text-align: center;
-  border-bottom: 1px solid #ddd;
 }
 
 th {
   background-color: #ffcc00;
   color: #000;
-  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 tr:hover {
-  background-color: #f9f9f9;
-}
-
-.loading, .error {
-  font-size: 16px;
-  color: #888;
-  text-align: center;
-  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.2);
 }
