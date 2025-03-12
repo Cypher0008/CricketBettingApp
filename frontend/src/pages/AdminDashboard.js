@@ -57,18 +57,24 @@ const AdminDashboard = () => {
     }
   };
 
-  // ✅ Approve or Reject Credit Request
-  const handleCreditAction = async (id, action) => {
+  // ✅ Handle Approve/Reject Credit Request
+  const handleCreditAction = async (id, status, reason = '') => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(
+      const { data } = await axios.post(
         `${process.env.REACT_APP_API_URL}/api/admin/credit-requests/${id}`,
-        { action },
+        { status, reason },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      fetchCreditRequests(); // ✅ Refresh after action
+
+      // ✅ Update State Directly After Action
+      setCreditRequests((prev) =>
+        prev.map((req) =>
+          req._id === data.request._id ? { ...req, ...data.request } : req
+        )
+      );
     } catch (error) {
-      console.error(`Failed to ${action} credit request:`, error);
+      console.error(`Failed to ${status} credit request:`, error);
     }
   };
 
@@ -80,7 +86,9 @@ const AdminDashboard = () => {
         await axios.delete(`${process.env.REACT_APP_API_URL}/api/admin/users/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        fetchUsers(); // ✅ Refresh after deletion
+
+        // ✅ Update State Directly After Action
+        setUsers((prev) => prev.filter((user) => user._id !== id));
       } catch (error) {
         console.error('Failed to delete user:', error);
       }
@@ -95,7 +103,9 @@ const AdminDashboard = () => {
         await axios.delete(`${process.env.REACT_APP_API_URL}/api/admin/bets/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        fetchBets(); // ✅ Refresh after deletion
+
+        // ✅ Update State Directly After Action
+        setBets((prev) => prev.filter((bet) => bet._id !== id));
       } catch (error) {
         console.error('Failed to delete bet:', error);
       }
@@ -183,6 +193,8 @@ const AdminDashboard = () => {
               <th>Amount</th>
               <th>Team</th>
               <th>Status</th>
+              <th>Bet Type</th>
+              <th>Prediction</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -194,6 +206,8 @@ const AdminDashboard = () => {
                 <td>{bet.amount}</td>
                 <td>{bet.team}</td>
                 <td>{bet.status}</td>
+                <td>{bet.betType}</td>
+                <td>{bet.predictionValue || 'N/A'}</td>
                 <td>
                   <button onClick={() => handleDeleteBet(bet._id)}>❌ Cancel Bet</button>
                 </td>

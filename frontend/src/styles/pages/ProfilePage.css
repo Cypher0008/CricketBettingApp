@@ -81,7 +81,8 @@
   background-color: #ffcc00;
   color: #000;
   border: none;
-  padding: 10px 20px;
+  width: 150px;
+  padding: 8px;
   border-radius: 5px;
   font-weight: bold;
   cursor: pointer;

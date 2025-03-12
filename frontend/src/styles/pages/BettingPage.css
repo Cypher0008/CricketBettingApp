@@ -1,54 +1,104 @@
-.betting-container {
+.betting-page {
+  padding: 30px;
   max-width: 600px;
   margin: 40px auto;
-  background: #ffffff;
-  padding: 24px;
+  background-color: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 h2 {
   font-size: 24px;
-  margin-bottom: 16px;
+  color: #222;
+  margin-bottom: 20px;
+  text-align: center;
 }
 
-.match-info {
+.odds-container {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
   margin-bottom: 20px;
 }
 
-.bet-section {
-  margin-bottom: 20px;
+.odds-label {
+  font-weight: bold;
+  margin-right: 8px;
 }
 
-label {
-  font-size: 16px;
-  margin-bottom: 8px;
-  display: block;
+.odds-box {
+  padding: 10px 20px;
+  background-color: #ffd700;
+  color: #000;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.odds-box.selected {
+  background-color: #ffcc00;
+  border: 2px solid #ff8800;
+  transform: scale(1.05);
+}
+
+.bet-type-section,
+.prediction-input,
+.amount-section {
+  margin-bottom: 20px;
 }
 
 select,
 input {
   width: 100%;
-  padding: 10px;
-  font-size: 16px;
-  margin-top: 4px;
+  padding: 12px;
   border: 1px solid #ccc;
   border-radius: 8px;
+  margin-top: 8px;
+  font-size: 16px;
 }
 
-.confirm-bet-btn {
+input:focus,
+select:focus {
+  border-color: #ffcc00;
+  outline: none;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+button {
+  flex: 1;
+  padding: 12px;
   background-color: #ffcc00;
   color: #000;
-  font-size: 18px;
-  padding: 12px;
+  font-weight: bold;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  width: 100%;
-  margin-top: 16px;
-  transition: background 0.3s;
+  transition: background-color 0.2s ease;
 }
 
-.confirm-bet-btn:hover {
-  background-color: #ffb700;
+button:hover {
+  background-color: #e6b800;
+}
+
+button:disabled {
+  background-color: #ccc;
+}
+
+.confirm-button {
+  background-color: #ffd700;
+}
+
+.cancel-button {
+  background-color: #ff6666;
+  color: #fff;
+}
+
+.cancel-button:hover {
+  background-color: #ff4d4d;
 }

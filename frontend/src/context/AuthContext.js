@@ -14,26 +14,43 @@ export const AuthProvider = ({ children }) => {
     Boolean(localStorage.getItem('token'))
   );
 
-  const [isAdmin, setIsAdmin] = useState(
-    localStorage.getItem('role') === 'admin'
-  );
+  // ✅ Fix: Read from localStorage on refresh
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const role = localStorage.getItem('role');
+    console.log('Setting initial isAdmin:', role === 'admin');
+    return role === 'admin';
+  });
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         console.log('Fetching user profile...');
         const profile = await getProfile();
-        setUser(profile);
-        setIsAuthenticated(true);
-        setIsAdmin(profile.role === 'admin');
 
-        // ✅ Store to localStorage
-        localStorage.setItem('user', JSON.stringify(profile));
-        localStorage.setItem('role', profile.role);
+        console.log('Profile loaded:', profile);
+
+        if (profile && profile.role) {
+          setUser(profile);
+          setIsAuthenticated(true);
+
+          console.log('Role from profile:', profile.role);
+
+          // ✅ FIX: Ensure profile.role is available before updating state
+          if (profile.role) {
+            setIsAdmin(profile.role === 'admin');
+            localStorage.setItem('role', profile.role);
+          } else {
+            console.warn('No role found in profile');
+          }
+
+          // ✅ Store profile in localStorage
+          localStorage.setItem('user', JSON.stringify(profile));
+        }
       } catch (error) {
         console.error('Failed to load user profile:', error);
         setIsAuthenticated(false);
 
+        // ✅ Token Refresh Logic
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
           try {
@@ -58,7 +75,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     if (localStorage.getItem('token')) {
-      loadUser(); // ✅ Load user on app start
+      loadUser();
     }
   }, []);
 
@@ -74,6 +91,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('role', user.role);
+     // localStorage.setItem('isAdmin', user.role === 'admin' ? 'true' : 'false');
       localStorage.setItem('user', JSON.stringify(user));
 
       console.log('Login successful!');
