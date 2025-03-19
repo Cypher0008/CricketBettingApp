@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { getLiveMatches, getMatchesByDate, debugCheckOdds } from '../api/apiService';
+import { getLiveMatches } from '../api/apiService';
 import { useNavigate } from 'react-router-dom';
 import '../styles/pages/HomePage.css';
+import { wsService } from '../services/websocketService';
 
 const HomePage = () => {
   const [matches, setMatches] = useState([]);
@@ -11,63 +12,83 @@ const HomePage = () => {
   const [league, setLeague] = useState('');
   const [date, setDate] = useState('');
   const navigate = useNavigate();
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  useEffect(() => {
-    const fetchMatches = async () => {
+  // Add a helper function for formatting dates
+  const formatMatchDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date');
+      }
+      return date.toLocaleString('en-US', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Date not available';
+    }
+  };
+
+  // Fetch matches function
+  const fetchMatches = async () => {
+    try {
       setLoading(true);
       setError(null);
-      
-      try {
-        let data = [];
-        
-        if (activeTab === 'live') {
-          data = await getLiveMatches();
-        } else {
-          const dateToFetch = activeTab === 'recent'
-                ? new Date(new Date().setDate(new Date().getDate() - 1)).toLocaleDateString('en-CA')
-                : new Date(new Date().setDate(new Date().getDate() + 1)).toLocaleDateString('en-CA');
+      const data = await getLiveMatches();
+      setMatches(data);
+      setLastUpdate(new Date());
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching matches:', error);
+      setError('Failed to load matches');
+      setLoading(false);
+    }
+  };
 
-          data = await getMatchesByDate(dateToFetch);
-        }
-
-        // If no matches were found, try the debug endpoint
-        if (data.length === 0) {
-          console.log('No matches found, checking debug endpoint...');
-          const debugData = await debugCheckOdds();
-          
-          if (debugData.success && debugData.oddsCount > 0) {
-            console.log('Found odds data in debug endpoint, but API returned no matches');
-            setError(`Found ${debugData.oddsCount} odds entries in database, but couldn't convert them to matches. Check server logs.`);
-          } else {
-            setError(debugData.message || 'No matches or odds data available');
-          }
-        }
-
-        // Filter by league and date if selected
-        if (league && data.length > 0) {
-          data = data.filter((match) => match.league === league);
-        }
-        if (date && data.length > 0) {
-          data = data.filter((match) => match.scheduled.startsWith(date));
-        }
-
-        setMatches(data);
-      } catch (error) {
-        console.error('Failed to fetch matches:', error);
-        setError('Failed to fetch matches. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
+    // Initial fetch
     fetchMatches();
-  }, [activeTab, league, date]);
+
+    // Set up WebSocket
+    wsService.connect();
+    
+    // Subscribe to updates
+    const unsubscribe = wsService.subscribe((updatedOdds) => {
+      setMatches(prevMatches => {
+        return prevMatches.map(match => {
+          const updatedOdd = updatedOdds.find(odd => odd.matchId === match.id);
+          if (updatedOdd) {
+            return {
+              ...match,
+              home_odds: updatedOdd.homeOdds,
+              away_odds: updatedOdd.awayOdds,
+              lastUpdate: new Date()
+            };
+          }
+          return match;
+        });
+      });
+      setLastUpdate(new Date());
+    });
+
+    // Cleanup
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="home-container">
       <h2>🏏 Cricket Matches with Betting Odds</h2>
+      <p className="last-update">Last updated: {lastUpdate.toLocaleTimeString()}</p>
 
-      {/* ✅ Search + Filter */}
+      {/* Filter Bar */}
       <div className="filter-bar">
         <input
           type="date"
@@ -82,7 +103,7 @@ const HomePage = () => {
         </select>
       </div>
 
-      {/* ✅ Tab Switcher */}
+      {/* Tab Switcher */}
       <div className="tab-container">
         <button
           className={`tab ${activeTab === 'live' ? 'active' : ''}`}
@@ -110,23 +131,27 @@ const HomePage = () => {
       {/* Error state */}
       {error && <div className="error-message">{error}</div>}
 
-      {/* ✅ Match List */}
+      {/* Match List */}
       <div className="match-list">
         {!loading && !error && matches.length > 0 ? (
           matches.map((match) => (
             <div key={match.id} className="match-card">
               <h3>{match.league || 'Cricket League'} - {match.home_team} vs {match.away_team}</h3>
               <p>📍 Venue: {match.venue || 'TBD'}</p>
-              <p>📅 Date: {new Date(match.scheduled).toLocaleString()}</p>
+              <p>📅 Date: {formatMatchDate(match.scheduled)}</p>
               <p>🔥 Status: {match.status}</p>
               
-              {/* ✅ Display Odds */}
+              {/* Display Odds */}
               <div className="odds-display">
-                <p>📊 Odds: {match.home_team}: <strong>{match.home_odds}</strong> | {match.away_team}: <strong>{match.away_odds}</strong></p>
+                <p>📊 Odds: {match.home_team}: 
+                  <strong>{parseFloat(match.home_odds).toFixed(2)}</strong> | 
+                  {match.away_team}: 
+                  <strong>{parseFloat(match.away_odds).toFixed(2)}</strong>
+                </p>
                 <p>🏢 Bookmaker: {match.bookmaker || 'Unknown'}</p>
               </div>
 
-              {/* ✅ Score and Winner Only if Completed */}
+              {/* Score and Winner Only if Completed */}
               {match.status === 'closed' && (
                 <>
                   <p>🏆 Winner: {match.match_winner}</p>
@@ -139,19 +164,23 @@ const HomePage = () => {
                 <button onClick={() => navigate(`/match/${match.id}`)}>
                   Match Details
                 </button>
-                {match.status === 'not_started' && (
+                {/* Show Bet Now button for any match that isn't finished/closed */}
+                {match.status !== 'closed' && match.status !== 'finished' && (
                   <button onClick={() => {
-                    const matchIdParts = match.id.split('_');
-                    const dateString = matchIdParts[1];
-                    const formattedMatchId = `match_${dateString}_${match.home_team.replace(/ /g, '')}_${match.away_team.replace(/ /g, '')}`;
+                    // Log the match ID for debugging
+                    console.log('Match ID before encoding:', match.id);
                     
-                    console.log('Original match ID:', match.id);
-                    console.log('Bookmaker:', match.bookmaker);
+                    // Replace slashes with a different character to avoid URL path issues
+                    const safeMatchId = String(match.id).replace(/\//g, '___');
                     
-                    // Pass both matchId and bookmaker in the URL
-                    const encodedMatchId = encodeURIComponent(encodeURIComponent(formattedMatchId));
-                    const encodedBookmaker = encodeURIComponent(match.bookmaker);
-                    navigate(`/betting/${encodedMatchId}?bookmaker=${encodedBookmaker}`);
+                    // Encode the safe match ID
+                    const encodedMatchId = encodeURIComponent(safeMatchId);
+                    const encodedBookmaker = encodeURIComponent(match.bookmaker || 'DraftKings');
+                    
+                    const targetUrl = `/betting/${encodedMatchId}?bookmaker=${encodedBookmaker}`;
+                    console.log('Navigating to:', targetUrl);
+                    
+                    navigate(targetUrl);
                   }}>
                     Bet Now
                   </button>

@@ -59,6 +59,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+  transition: background-color 0.3s ease;
 }
 
 .odds-box:hover {
@@ -69,6 +70,10 @@
 .odds-box.selected {
   border-color: #28a745;
   background-color: #e9f7ef;
+}
+
+.odds-box.updating {
+  background-color: rgba(255, 255, 0, 0.1);
 }
 
 .team-name {
@@ -161,4 +166,11 @@
   border-radius: 6px;
   margin: 20px 0;
   text-align: center;
+}
+
+.last-update {
+  font-size: 0.8em;
+  color: #666;
+  text-align: right;
+  margin-top: 5px;
 }

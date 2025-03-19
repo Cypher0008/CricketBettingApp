@@ -144,3 +144,23 @@ select:focus {
     width: 100%;
   }
 }
+
+.updating {
+  animation: flash 1s infinite;
+}
+
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.last-update {
+  font-size: 0.8em;
+  color: #666;
+  text-align: right;
+  margin: 10px 0;
+}
+
+.odds-display strong {
+  transition: opacity 0.3s ease;
+}

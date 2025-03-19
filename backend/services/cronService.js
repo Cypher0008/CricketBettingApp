@@ -3,74 +3,90 @@ const { fetchOddsFromSheet } = require('./googleSheetsService');
 const Odds = require('../models/Odds');
 const Match = require('../models/Match');
 
-// Function to update odds in the database
-async function updateOddsInDatabase(oddsData) {
-  try {
-    console.log('🔄 Updating odds in database...');
-    
-    if (!oddsData || oddsData.length === 0) {
-      console.log('⚠️ No odds data to update');
-      return;
-    }
-    
-    // For each odds entry from the sheet
-    for (const odds of oddsData) {
-      // Use upsert to update if exists or create if not
-      await Odds.findOneAndUpdate(
-        { matchId: odds.matchId, bookmaker: odds.bookmaker },
-        odds,
-        { upsert: true, new: true }
-      );
-      
-      // Check if we need to create a match entry if it doesn't exist
-      const matchExists = await Match.findOne({ matchId: odds.matchId });
-      if (!matchExists) {
-        const newMatch = new Match({
-          matchId: odds.matchId,
-          team1: odds.homeTeam,
-          team2: odds.awayTeam,
-          scheduled: new Date(), // You might want to get this from the sheet too
-          status: "scheduled"
-        });
-        await newMatch.save();
-        console.log(`✅ Created new match entry for ${odds.homeTeam} vs ${odds.awayTeam}`);
-      }
-    }
-    
-    console.log(`✅ Odds updated successfully for ${oddsData.length} matches`);
-  } catch (error) {
-    console.error('❌ Error updating odds in database:', error.message);
-    console.error('Error stack:', error.stack);
+// Helper function to normalize match status
+function normalizeStatus(status) {
+  status = status.toLowerCase();
+  if (status === 'pending' || status === 'scheduled') {
+    return 'not_started';
   }
+  if (status === 'completed' || status === 'finished') {
+    return 'closed';
+  }
+  return status;
 }
 
-// Initialize cron job to fetch odds every minute
-function initOddsCronJob() {
-  console.log('🕒 Initializing odds cron job...');
-  
-  // Run immediately on startup
-  (async () => {
+const initOddsCronJob = (broadcastCallback) => {
+  // Run every 15 seconds
+  cron.schedule('*/15 * * * * *', async () => {
     try {
-      console.log('⏰ Running initial odds update...');
-      const oddsData = await fetchOddsFromSheet();
-      await updateOddsInDatabase(oddsData);
+      console.log('🔄 Fetching latest odds...');
+      const latestOdds = await fetchOddsFromSheet();
+      const updatedOdds = [];
+
+      // Update database and broadcast changes
+      for (const odds of latestOdds) {
+        try {
+          // Find existing odds record
+          const existingOdds = await Odds.findOne({
+            matchId: odds.matchId,
+            bookmaker: odds.bookmaker
+          });
+
+          if (existingOdds) {
+            // Check if odds have changed
+            if (existingOdds.homeOdds !== odds.homeOdds || 
+                existingOdds.awayOdds !== odds.awayOdds) {
+              const updatedOdd = await Odds.findOneAndUpdate(
+                { matchId: odds.matchId, bookmaker: odds.bookmaker },
+                { ...odds, lastUpdated: new Date() },
+                { new: true }
+              );
+              updatedOdds.push(updatedOdd);
+              console.log(`📊 Updated odds for match: ${odds.matchId}`);
+            }
+          } else {
+            const newOdd = await Odds.create({
+              ...odds,
+              lastUpdated: new Date()
+            });
+            updatedOdds.push(newOdd);
+            console.log(`📊 Created new odds for match: ${odds.matchId}`);
+          }
+
+          // Check if we need to create a match entry
+          const matchExists = await Match.findOne({ matchId: odds.matchId });
+          if (!matchExists) {
+            await Match.create({
+              matchId: odds.matchId,
+              team1: odds.homeTeam,
+              team2: odds.awayTeam,
+              scheduled: new Date(odds.commence),
+              status: normalizeStatus(odds.status || "not_started")
+            });
+            console.log(`✅ Created new match entry for ${odds.homeTeam} vs ${odds.awayTeam}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error processing odds for match ${odds.matchId}:`, error);
+        }
+      }
+
+      // Only broadcast if there were actual updates
+      if (updatedOdds.length > 0) {
+        console.log(`✅ Updated odds for ${updatedOdds.length} matches`);
+        if (broadcastCallback) {
+          broadcastCallback(updatedOdds);
+          console.log('🔄 Broadcasted odds updates to connected clients');
+        }
+      } else {
+        console.log('ℹ️ No odds updates needed');
+      }
+      
     } catch (error) {
-      console.error('❌ Initial odds update failed:', error.message);
-    }
-  })();
-  
-  // Schedule to run every minute
-  cron.schedule('* * * * *', async () => {
-    try {
-      console.log('⏰ Running scheduled odds update...');
-      const oddsData = await fetchOddsFromSheet();
-      await updateOddsInDatabase(oddsData);
-    } catch (error) {
-      console.error('❌ Cron job failed:', error.message);
+      console.error('❌ Error in cron job:', error);
     }
   });
-  
-  console.log('✅ Odds cron job initialized');
-}
+
+  console.log('✅ Initialized WebSocket odds update service');
+};
 
 module.exports = { initOddsCronJob }; 

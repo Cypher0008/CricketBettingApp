@@ -3,6 +3,27 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/pages/BettingPage.css';
 import BetConfirmationModal from '../components/BetConfirmationModal';
+import { wsService } from '../services/websocketService';
+
+const formatMatchDate = (dateString) => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date');
+    }
+    return date.toLocaleString('en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (error) {
+    console.error('Error formatting date:', dateString, error);
+    return 'Date not available';
+  }
+};
 
 const BettingPage = () => {
   const { matchId } = useParams();
@@ -13,6 +34,7 @@ const BettingPage = () => {
   
   console.log('BettingPage mounted');
   console.log('Raw matchId from params:', matchId);
+  console.log('Preferred bookmaker:', preferredBookmaker);
 
   const [matchDetails, setMatchDetails] = useState(null);
   const [betType, setBetType] = useState('winner');
@@ -25,38 +47,81 @@ const BettingPage = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [userCredits, setUserCredits] = useState(0);
 
-  // Fetch both match details and user profile
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const decodedMatchId = decodeURIComponent(decodeURIComponent(matchId));
-        
-        // Fetch match details with preferred bookmaker
-        const matchResponse = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/betting/${encodeURIComponent(decodedMatchId)}`,
-          { params: { bookmaker: preferredBookmaker } }
-        );
-        
-        // If the response indicates a different bookmaker was used, update the URL
-        if (matchResponse.data.bookmaker !== preferredBookmaker) {
-          const newUrl = `/betting/${encodeURIComponent(matchId)}?bookmaker=${encodeURIComponent(matchResponse.data.bookmaker)}`;
-          navigate(newUrl, { replace: true });
+  // Add polling interval state
+  const [pollingInterval, setPollingInterval] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+
+  // Separate data fetching function
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Convert any special encoding back to slashes
+      const decodedMatchId = matchId.replace(/___/g, '/');
+      
+      // Get the auth token
+      const token = localStorage.getItem('token');
+      
+      // Make the API request with the auth token
+      const matchResponse = await axios.get(
+        `${process.env.REACT_APP_API_URL}/api/betting/${encodeURIComponent(decodedMatchId)}`,
+        { 
+          params: { bookmaker: preferredBookmaker },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          timeout: 10000
         }
-        
-        setMatchDetails(matchResponse.data);
-        setUserCredits(matchResponse.data.userCredits);
-        console.log('User credits loaded:', matchResponse.data.userCredits);
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error in fetchData:', error);
-        setError(error.response?.data?.error || 'Failed to load data');
-        setLoading(false);
+      );
+      
+      // Update match details and last update time
+      setMatchDetails(matchResponse.data);
+      setLastUpdate(new Date());
+      
+      // Fetch user profile to get accurate credits
+      if (token) {
+        const userResponse = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/user/profile`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setUserCredits(userResponse.data.credits);
+      } else {
+        setUserCredits(matchResponse.data.userCredits || 1000);
       }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error in fetchData:', error);
+      setError(error.response?.data?.error || 'Failed to load data');
+      setLoading(false);
+    }
+  };
+
+  // Effect for initial load and polling
+  useEffect(() => {
+    // Connect to WebSocket
+    wsService.connect();
+
+    // Subscribe to odds updates
+    const unsubscribe = wsService.subscribe((newOdds) => {
+      const updatedOdds = newOdds.find(odds => odds.matchId === matchId);
+      if (updatedOdds && matchDetails) {
+        setMatchDetails(prev => ({
+          ...prev,
+          home_odds: updatedOdds.homeOdds,
+          away_odds: updatedOdds.awayOdds
+        }));
+        setLastUpdate(new Date());
+      }
+    });
+
+    // Initial fetch
+    if (matchId) {
+      fetchData();
+    }
+
+    // Cleanup
+    return () => {
+      unsubscribe();
     };
-    
-    fetchData();
   }, [matchId, preferredBookmaker]);
 
   // Calculate potential winnings whenever team or amount changes
@@ -66,12 +131,29 @@ const BettingPage = () => {
       return;
     }
 
-    const odds = team === matchDetails.home_team 
-      ? matchDetails.home_odds 
-      : matchDetails.away_odds;
-    
-    const winnings = parseFloat(amount) * parseFloat(odds);
-    setPotentialWinnings(winnings.toFixed(2));
+    try {
+      // Get the odds for the selected team
+      let odds = team === matchDetails.home_team 
+        ? matchDetails.home_odds 
+        : matchDetails.away_odds;
+      
+      // Ensure odds is a number
+      odds = parseFloat(odds);
+      
+      // Check if odds is a valid number
+      if (isNaN(odds)) {
+        console.error('Invalid odds value:', odds);
+        setPotentialWinnings(0);
+        return;
+      }
+      
+      // Calculate winnings
+      const winnings = parseFloat(amount) * odds;
+      setPotentialWinnings(winnings.toFixed(2));
+    } catch (error) {
+      console.error('Error calculating potential winnings:', error);
+      setPotentialWinnings(0);
+    }
   }, [team, amount, matchDetails]);
 
   // Handle opening the confirmation modal
@@ -122,7 +204,7 @@ const BettingPage = () => {
       const response = await axios.post(
         `${process.env.REACT_APP_API_URL}/api/bet/place`,
         {
-          matchId: decodeURIComponent(decodeURIComponent(matchId)),
+          matchId: matchId, // Remove the double decoding here as well
           team,
           amount: parseFloat(amount),
           betType: 'winner'
@@ -157,7 +239,7 @@ const BettingPage = () => {
       {/* Match Details */}
       <div className="match-header">
         <h2>🏏 {matchDetails.home_team} vs {matchDetails.away_team}</h2>
-        <p className="match-date">📅 {new Date(matchDetails.scheduled).toLocaleString()}</p>
+        <p className="match-date">📅 {formatMatchDate(matchDetails.scheduled)}</p>
         <p className="match-venue">📍 {matchDetails.venue || 'TBD'}</p>
       </div>
       
@@ -168,8 +250,8 @@ const BettingPage = () => {
       
       {/* Bookmaker Info */}
       <div className="bookmaker-info">
-        <p>📊 Odds provided by: <strong>DraftKings</strong></p>
-        <p>⏰ Last updated: <strong>{new Date().toLocaleString()}</strong></p>
+        <p>📊 Odds provided by: <strong>{matchDetails.bookmaker}</strong></p>
+        <p>⏰ Last updated: <strong>{lastUpdate.toLocaleTimeString()}</strong></p>
       </div>
 
       {/* Current Odds */}
@@ -181,14 +263,22 @@ const BettingPage = () => {
             onClick={() => setTeam(matchDetails.home_team)}
           >
             <span className="team-name">{matchDetails.home_team}</span>
-            <span className="odds-value">{matchDetails.home_odds?.toFixed(2)}</span>
+            <span className="odds-value">
+              {typeof matchDetails.home_odds === 'number' 
+                ? matchDetails.home_odds.toFixed(2) 
+                : parseFloat(matchDetails.home_odds || 0).toFixed(2)}
+            </span>
           </div>
           <div
             className={`odds-box ${team === matchDetails.away_team ? 'selected' : ''}`}
             onClick={() => setTeam(matchDetails.away_team)}
           >
             <span className="team-name">{matchDetails.away_team}</span>
-            <span className="odds-value">{matchDetails.away_odds?.toFixed(2)}</span>
+            <span className="odds-value">
+              {typeof matchDetails.away_odds === 'number' 
+                ? matchDetails.away_odds.toFixed(2) 
+                : parseFloat(matchDetails.away_odds || 0).toFixed(2)}
+            </span>
           </div>
         </div>
       </div>

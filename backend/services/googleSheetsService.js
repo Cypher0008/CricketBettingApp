@@ -15,6 +15,58 @@ async function getAuthClient() {
   return auth.getClient();
 }
 
+// Update the parseDate function
+function parseDate(dateString) {
+  try {
+    console.log('Parsing date string:', dateString);
+
+    if (!dateString) {
+      console.warn('Empty date string, using current date');
+      return new Date().toISOString();
+    }
+
+    // Handle DD/MM/YYYY format
+    if (dateString.includes('/')) {
+      const [month, day, year] = dateString.split('/'); // Changed order since input is MM/DD/YYYY
+      const fullYear = year.length === 2 ? '20' + year : year;
+      // Create date using correct order: year, month (0-based), day
+      const date = new Date(parseInt(fullYear), parseInt(month) - 1, parseInt(day));
+      console.log('Parsed date:', date.toISOString());
+      return date.toISOString();
+    }
+
+    // Handle YYYY-MM-DD format
+    if (dateString.includes('-')) {
+      const date = new Date(dateString);
+      console.log('Parsed date:', date.toISOString());
+      return date.toISOString();
+    }
+
+    // Try parsing as a timestamp
+    const timestamp = Date.parse(dateString);
+    if (!isNaN(timestamp)) {
+      const date = new Date(timestamp);
+      console.log('Parsed date:', date.toISOString());
+      return date.toISOString();
+    }
+
+    throw new Error(`Unable to parse date: ${dateString}`);
+  } catch (error) {
+    console.error('Error parsing date:', dateString, error);
+    return new Date().toISOString();
+  }
+}
+
+// Revert back to the original version that worked without duplicates
+function generateMatchId(homeTeam, awayTeam) {
+  // Remove spaces and special characters from team names
+  const cleanHomeTeam = homeTeam.replace(/[^a-zA-Z0-9]/g, '');
+  const cleanAwayTeam = awayTeam.replace(/[^a-zA-Z0-9]/g, '');
+  
+  // Create a consistent matchId format without date
+  return `match_${cleanHomeTeam}_${cleanAwayTeam}`;
+}
+
 // Fetch odds data from Google Sheets
 async function fetchOddsFromSheet() {
   try {
@@ -65,8 +117,10 @@ async function fetchOddsFromSheet() {
       throw new Error('Required columns missing in spreadsheet');
     }
     
-    // Transform sheet data into structured odds data
+    // Keep track of processed matches to avoid duplicates
+    const processedMatches = new Set();
     const oddsData = [];
+
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row.length > 0 && row[eventNameIndex]) {
@@ -96,35 +150,44 @@ async function fetchOddsFromSheet() {
           }
         }
         
-        // Generate a unique match ID if none exists
-        const matchId = `match_${row[commenceIndex]}_${homeTeam.replace(/\s+/g, '')}_${awayTeam.replace(/\s+/g, '')}`;
-        
-        oddsData.push({
-          matchId: matchId,
-          homeTeam: homeTeam.trim(),
-          awayTeam: awayTeam.trim(),
-          homeOdds: parseFloat(row[odd1Index]) || 1.0,
-          awayOdds: parseFloat(row[odd2Index]) || 1.0,
-          bookmaker: row[bookmakerIndex],
-          commence: row[commenceIndex],
-          status: row[statusIndex],
-          lastUpdated: new Date()
-        });
+        // Generate matchId
+        const matchId = generateMatchId(homeTeam.trim(), awayTeam.trim());
+
+        // Only process odds if we haven't seen this match before
+        if (!processedMatches.has(matchId)) {
+          processedMatches.add(matchId);
+          
+          oddsData.push({
+            matchId: matchId,
+            homeTeam: homeTeam.trim(),
+            awayTeam: awayTeam.trim(),
+            homeOdds: parseFloat(row[odd1Index]) || 1.0,
+            awayOdds: parseFloat(row[odd2Index]) || 1.0,
+            bookmaker: row[bookmakerIndex],
+            commence: parseDate(row[commenceIndex]),
+            status: row[statusIndex],
+            lastUpdated: new Date()
+          });
+
+          console.log(`📊 Processing match: ${homeTeam.trim()} vs ${awayTeam.trim()} with first bookmaker: ${row[bookmakerIndex]}`);
+        } else {
+          console.log(`⏭️ Skipping duplicate match: ${homeTeam.trim()} vs ${awayTeam.trim()} from bookmaker: ${row[bookmakerIndex]}`);
+        }
       }
     }
     
-    console.log(`✅ Successfully processed odds for ${oddsData.length} matches`);
+    console.log(`✅ Successfully processed odds for ${oddsData.length} unique matches`);
     if (oddsData.length > 0) {
       console.log(`📊 Sample match: ${oddsData[0].homeTeam} vs ${oddsData[0].awayTeam}, Odds: ${oddsData[0].homeOdds}-${oddsData[0].awayOdds}`);
     }
     
     return oddsData;
   } catch (error) {
-    console.error('❌ Error fetching odds from Google Sheets:', error);
-    console.error('Error details:', error.stack);
-    // Return empty array instead of throwing to prevent cron job from crashing
-    return [];
+    console.error('Error fetching odds from sheet:', error);
+    throw error;
   }
 }
 
-module.exports = { fetchOddsFromSheet }; 
+module.exports = {
+  fetchOddsFromSheet
+}; 

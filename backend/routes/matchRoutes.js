@@ -396,4 +396,40 @@ router.get("/betting/:matchId", async (req, res) => {
   }
 });
 
+router.get('/live', async (req, res) => {
+  try {
+    const matches = await Match.find().sort({ scheduled: 1 });
+    const matchesWithOdds = await Promise.all(matches.map(async (match) => {
+      const odds = await Odds.findOne({ 
+        matchId: match.matchId,
+        bookmaker: 'DraftKings'  // Prefer DraftKings odds
+      }).sort({ lastUpdated: -1 });
+
+      if (!odds) {
+        console.log(`No odds found for match: ${match.matchId}`);
+        return null;
+      }
+
+      return {
+        id: match.matchId,
+        home_team: match.team1,
+        away_team: match.team2,
+        scheduled: match.scheduled,
+        status: match.status,
+        home_odds: odds.homeOdds,
+        away_odds: odds.awayOdds,
+        bookmaker: odds.bookmaker
+      };
+    }));
+
+    // Filter out matches without odds
+    const validMatches = matchesWithOdds.filter(match => match !== null);
+    console.log(`📊 Found ${validMatches.length} DraftKings odds entries`);
+    res.json(validMatches);
+  } catch (error) {
+    console.error('Error fetching live matches:', error);
+    res.status(500).json({ error: 'Failed to fetch matches' });
+  }
+});
+
 module.exports = router;
