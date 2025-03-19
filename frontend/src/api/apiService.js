@@ -2,30 +2,52 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL + '/api';
 
+// Create axios instance with better error handling
+const apiClient = axios.create({
+  baseURL: API_URL,
+  timeout: 10000
+});
+
+// Add response interceptor for better error logging
+apiClient.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
 // ✅ Fetch Live Matches
 export const getLiveMatches = async () => {
   try {
-    const { data } = await axios.get(`${API_URL}/matches/live`);
+    console.log('Fetching live matches from:', `${API_URL}/matches/live`);
+    const { data } = await apiClient.get('/matches/live');
+    console.log('Live matches data:', data);
     return data;
   } catch (error) {
-    throw error.response?.data?.error || "Failed to fetch live matches";
+    console.error('Failed to fetch live matches:', error.response?.data?.error || error.message);
+    // Return empty array instead of throwing to prevent UI crashes
+    return [];
   }
 };
 
-// ✅ Fetch Match by Date
+// ✅ Fetch Matches by Date
 export const getMatchesByDate = async (date) => {
   try {
-    const { data } = await axios.get(`${API_URL}/matches/${date}`);
+    console.log('Fetching matches for date:', date);
+    const { data } = await apiClient.get(`/matches/${date}`);
+    console.log('Matches data:', data);
     return data;
   } catch (error) {
-    throw error.response?.data?.error || "Failed to fetch matches by date";
+    console.error('Failed to fetch matches by date:', error.response?.data?.error || error.message);
+    return [];
   }
 };
 
 // ✅ Fetch Match Details
 export const getMatchDetails = async (matchId) => {
   try {
-    const { data } = await axios.get(`${API_URL}/match/${matchId}`);
+    const { data } = await apiClient.get(`/match/${matchId}`);
     return data;
   } catch (error) {
     throw error.response?.data?.error || "Failed to fetch match details";
@@ -36,7 +58,7 @@ export const getMatchDetails = async (matchId) => {
 export const placeBet = async (betData) => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.post(`${API_URL}/bet/place`, betData, {
+    const { data } = await apiClient.post('/bet/place', betData, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;
@@ -49,7 +71,7 @@ export const placeBet = async (betData) => {
 export const getAllBets = async () => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.get(`${API_URL}/bet/all`, {
+    const { data } = await apiClient.get('/bet/all', {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;
@@ -62,7 +84,7 @@ export const getAllBets = async () => {
 export const cancelBet = async (betId) => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.delete(`${API_URL}/bet/${betId}`, {
+    const { data } = await apiClient.delete(`/bet/${betId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;
@@ -75,8 +97,8 @@ export const cancelBet = async (betId) => {
 export const updateBet = async (betId, status) => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.put(
-      `${API_URL}/bet/update/${betId}`,
+    const { data } = await apiClient.put(
+      `/bet/update/${betId}`,
       { status },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -90,7 +112,7 @@ export const updateBet = async (betId, status) => {
 export const getAllUsers = async () => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.get(`${API_URL}/admin/users`, {
+    const { data } = await apiClient.get('/admin/users', {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;
@@ -103,7 +125,7 @@ export const getAllUsers = async () => {
 export const getAllCreditRequests = async () => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.get(`${API_URL}/admin/credit-requests`, {
+    const { data } = await apiClient.get('/admin/credit-requests', {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;
@@ -116,8 +138,8 @@ export const getAllCreditRequests = async () => {
 export const updateCreditRequest = async (id, status, reason) => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.post(
-      `${API_URL}/admin/credit-requests/${id}`,
+    const { data } = await apiClient.post(
+      `/admin/credit-requests/${id}`,
       { status, reason },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -131,7 +153,7 @@ export const updateCreditRequest = async (id, status, reason) => {
 export const getUserBets = async (username) => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.get(`${API_URL}/bet/${username}`, {
+    const { data } = await apiClient.get(`/bet/${username}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;
@@ -140,18 +162,29 @@ export const getUserBets = async (username) => {
   }
 };
 
-
 // ✅ Update Match Result
 export const updateMatchResult = async (matchId, winner) => {
   try {
     const token = localStorage.getItem("token");
-    const { data } = await axios.post(
-      `${API_URL}/admin/update-result`,
+    const { data } = await apiClient.post(
+      `/admin/update-result`,
       { matchId, winner },
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return data;
   } catch (error) {
     throw error.response?.data?.error || "Failed to update match result";
+  }
+};
+
+// ✅ Debug function to directly check odds data
+export const debugCheckOdds = async () => {
+  try {
+    const { data } = await apiClient.get('/debug/odds-direct');
+    console.log('Debug odds data:', data);
+    return data;
+  } catch (error) {
+    console.error('Debug check failed:', error.response?.data?.error || error.message);
+    return { success: false, error: error.message };
   }
 };

@@ -38,7 +38,7 @@ function App() {
             <Route path="/home" element={<HomePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/match/:matchId" element={<MatchDetailsPage />} />
-            <Route path="/betting/:matchId" element={<BettingPage />} />
+            <Route path="/betting/:matchId/*" element={<BettingPage />} />
             <Route path="/bets" element={<BetsPage />} />
           </Route>
 
