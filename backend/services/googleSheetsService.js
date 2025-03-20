@@ -9,7 +9,7 @@ const SHEET_NAME = 'Sheet1'; // Update this if your sheet has a different name
 // Initialize auth client
 async function getAuthClient() {
   const auth = new google.auth.GoogleAuth({
-    keyFile: 'credentials.json', // You'll need to create this service account key file
+    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
     scopes: SCOPES,
   });
   return auth.getClient();
