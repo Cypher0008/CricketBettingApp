@@ -72,13 +72,6 @@ async function fetchOddsFromSheet() {
   try {
     console.log('🔄 Fetching odds data from Google Sheets...');
     
-    // Check if credentials file exists
-    const fs = require('fs');
-    if (!fs.existsSync('./credentials.json')) {
-      console.error('❌ credentials.json file not found!');
-      throw new Error('Google API credentials file not found');
-    }
-    
     const authClient = await getAuthClient();
     
     console.log(`📊 Attempting to fetch data from spreadsheet ID: ${SPREADSHEET_ID}`);
