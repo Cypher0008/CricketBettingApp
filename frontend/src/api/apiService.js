@@ -21,11 +21,14 @@ apiClient.interceptors.response.use(
 export const getLiveMatches = async () => {
   try {
     const response = await axios.get(`${API_URL}/matches/live`);
-    console.log('API Response:', response); // Debug log
-    return response.data;
+    console.log('API Response:', response.data); // Debug log
+    
+    // Ensure we return an empty array if no data
+    return response.data || [];
   } catch (error) {
     console.error('Error fetching live matches:', error);
-    throw error;
+    // Return empty array on error to prevent undefined issues
+    return [];
   }
 };
 

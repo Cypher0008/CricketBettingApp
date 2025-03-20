@@ -1,82 +1,102 @@
 const mongoose = require('mongoose');
-const Match = require('../models/Match');
-require('dotenv').config(); // Add this to load environment variables
+const Odds = require('../models/Odds');
+require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bettingDB';
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('MongoDB connected for cleanup'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 async function cleanupDuplicates() {
   try {
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGODB_URI);
-    console.log('Connected to MongoDB');
-
-    // Get all matches
-    const matches = await Match.find({}).sort({ scheduled: 1 });
-    console.log(`Found ${matches.length} total matches`);
+    console.log('Starting duplicate cleanup by team names...');
     
-    // Create a map to store unique matches
-    const uniqueMatches = new Map();
+    // Get all odds
+    const allOdds = await Odds.find();
+    console.log(`Found ${allOdds.length} total odds entries`);
     
-    // Identify duplicates with more specific key including date
-    matches.forEach(match => {
-      const scheduledDate = new Date(match.scheduled).toISOString().split('T')[0];
-      const key = `${match.team1}_${match.team2}_${scheduledDate}`;
-      console.log(`Processing match: ${key}`);
+    // Group by team names (home_team vs away_team)
+    const teamGroups = {};
+    
+    allOdds.forEach(odd => {
+      // Create a consistent key using team names
+      const teamKey = `${odd.homeTeam.trim().toLowerCase()}_vs_${odd.awayTeam.trim().toLowerCase()}`;
       
-      if (!uniqueMatches.has(key)) {
-        uniqueMatches.set(key, match._id);
+      if (!teamGroups[teamKey]) {
+        teamGroups[teamKey] = [];
       }
+      teamGroups[teamKey].push(odd);
     });
     
-    // Delete duplicates
+    console.log(`Found ${Object.keys(teamGroups).length} unique matches by team names`);
+    
+    // For each match with multiple entries, keep only one (preferably DraftKings)
     let deletedCount = 0;
-    for (const match of matches) {
-      const scheduledDate = new Date(match.scheduled).toISOString().split('T')[0];
-      const key = `${match.team1}_${match.team2}_${scheduledDate}`;
+    
+    for (const teamKey in teamGroups) {
+      const odds = teamGroups[teamKey];
       
-      if (uniqueMatches.get(key) !== match._id) {
-        await Match.deleteOne({ _id: match._id });
-        console.log(`Deleted duplicate match: ${match.team1} vs ${match.team2} on ${scheduledDate}`);
-        deletedCount++;
+      if (odds.length > 1) {
+        console.log(`Match "${teamKey}" has ${odds.length} entries`);
+        
+        // Sort by lastUpdated only, no bookmaker preference
+        odds.sort((a, b) => {
+          return new Date(b.lastUpdated) - new Date(a.lastUpdated);
+        });
+        
+        // Keep the first one, delete the rest
+        const toKeep = odds[0];
+        const toDelete = odds.slice(1);
+        
+        console.log(`Keeping entry from ${toKeep.bookmaker} (${toKeep.matchId}), deleting ${toDelete.length} others`);
+        
+        for (const odd of toDelete) {
+          await Odds.deleteOne({ _id: odd._id });
+          deletedCount++;
+        }
       }
     }
     
-    // Also clean up any matches with invalid dates
-    const invalidDates = await Match.find({
-      scheduled: { 
-        $exists: true,
-        $type: "date",
-        $eq: null
+    console.log(`Cleanup complete. Deleted ${deletedCount} duplicate entries.`);
+    
+    // Update the cronService to use team names for grouping
+    console.log('Updating remaining entries to ensure consistent matchIds...');
+    
+    // Get all remaining odds
+    const remainingOdds = await Odds.find();
+    console.log(`Found ${remainingOdds.length} remaining odds entries`);
+    
+    // Create a mapping of team keys to matchIds
+    const teamKeyToMatchId = {};
+    
+    // First pass: collect all matchIds
+    remainingOdds.forEach(odd => {
+      const teamKey = `${odd.homeTeam.trim().toLowerCase()}_vs_${odd.awayTeam.trim().toLowerCase()}`;
+      if (!teamKeyToMatchId[teamKey]) {
+        teamKeyToMatchId[teamKey] = odd.matchId;
       }
     });
     
-    for (const match of invalidDates) {
-      await Match.deleteOne({ _id: match._id });
-      console.log(`Deleted match with invalid date: ${match.team1} vs ${match.team2}`);
-      deletedCount++;
+    // Second pass: update any inconsistent matchIds
+    let updatedCount = 0;
+    for (const odd of remainingOdds) {
+      const teamKey = `${odd.homeTeam.trim().toLowerCase()}_vs_${odd.awayTeam.trim().toLowerCase()}`;
+      const correctMatchId = teamKeyToMatchId[teamKey];
+      
+      if (odd.matchId !== correctMatchId) {
+        console.log(`Updating matchId for ${odd.homeTeam} vs ${odd.awayTeam}: ${odd.matchId} -> ${correctMatchId}`);
+        odd.matchId = correctMatchId;
+        await odd.save();
+        updatedCount++;
+      }
     }
-
-    console.log(`Cleanup completed. Deleted ${deletedCount} duplicate/invalid matches`);
-
-    // Log remaining matches for verification
-    const remainingMatches = await Match.find({}).sort({ scheduled: 1 });
-    console.log('\nRemaining matches:');
-    remainingMatches.forEach(match => {
-      console.log(`${match.team1} vs ${match.team2} on ${new Date(match.scheduled).toLocaleDateString()}`);
-    });
-
+    
+    console.log(`Updated ${updatedCount} entries with consistent matchIds`);
+    process.exit(0);
   } catch (error) {
     console.error('Error during cleanup:', error);
-  } finally {
-    await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    process.exit(1);
   }
 }
 
-// Run the cleanup if this file is executed directly
-if (require.main === module) {
-  cleanupDuplicates()
-    .catch(console.error);
-}
-
-module.exports = cleanupDuplicates; 
+cleanupDuplicates(); 

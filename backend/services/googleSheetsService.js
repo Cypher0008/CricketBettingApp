@@ -57,13 +57,13 @@ function parseDate(dateString) {
   }
 }
 
-// Revert back to the original version that worked without duplicates
+// Update the generateMatchId function to be more consistent
 function generateMatchId(homeTeam, awayTeam) {
   // Remove spaces and special characters from team names
-  const cleanHomeTeam = homeTeam.replace(/[^a-zA-Z0-9]/g, '');
-  const cleanAwayTeam = awayTeam.replace(/[^a-zA-Z0-9]/g, '');
+  const cleanHomeTeam = homeTeam.trim().replace(/[^a-zA-Z0-9]/g, '');
+  const cleanAwayTeam = awayTeam.trim().replace(/[^a-zA-Z0-9]/g, '');
   
-  // Create a consistent matchId format without date
+  // Create a consistent matchId format
   return `match_${cleanHomeTeam}_${cleanAwayTeam}`;
 }
 
@@ -117,68 +117,37 @@ async function fetchOddsFromSheet() {
       throw new Error('Required columns missing in spreadsheet');
     }
     
-    // Keep track of processed matches to avoid duplicates
-    const processedMatches = new Set();
+    // Remove the processedMatches tracking since we want all bookmakers
     const oddsData = [];
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row.length > 0 && row[eventNameIndex]) {
-        // Parse the event name to extract teams
         const eventName = row[eventNameIndex];
-        let homeTeam, awayTeam;
+        let [homeTeam, awayTeam] = eventName.includes(' vs ') ? 
+          eventName.split(' vs ') : eventName.split('_');
         
-        if (eventName.includes('_')) {
-          // Format: "Team1_Team2"
-          [homeTeam, awayTeam] = eventName.split('_');
-        } else if (eventName.includes(' vs ')) {
-          // Format: "Team1 vs Team2"
-          [homeTeam, awayTeam] = eventName.split(' vs ');
-        } else if (eventName.includes('vs.')) {
-          // Format: "Team1 vs. Team2"
-          [homeTeam, awayTeam] = eventName.split('vs.');
-        } else {
-          // Try to split by the last space before "vs"
-          const parts = eventName.split(/(?=_)/);
-          if (parts.length >= 2) {
-            homeTeam = parts[0].trim();
-            awayTeam = parts.slice(1).join('').trim();
-          } else {
-            // If all else fails, use the event name as is
-            homeTeam = eventName;
-            awayTeam = "Unknown Opponent";
-          }
-        }
-        
-        // Generate matchId
         const matchId = generateMatchId(homeTeam.trim(), awayTeam.trim());
+        
+        oddsData.push({
+          matchId: matchId,
+          homeTeam: homeTeam.trim(),
+          awayTeam: awayTeam.trim(),
+          homeOdds: parseFloat(row[odd1Index]) || 1.0,
+          awayOdds: parseFloat(row[odd2Index]) || 1.0,
+          bookmaker: row[bookmakerIndex],
+          commence: parseDate(row[commenceIndex]),
+          status: row[statusIndex],
+          lastUpdated: new Date()
+        });
 
-        // Only process odds if we haven't seen this match before
-        if (!processedMatches.has(matchId)) {
-          processedMatches.add(matchId);
-          
-          oddsData.push({
-            matchId: matchId,
-            homeTeam: homeTeam.trim(),
-            awayTeam: awayTeam.trim(),
-            homeOdds: parseFloat(row[odd1Index]) || 1.0,
-            awayOdds: parseFloat(row[odd2Index]) || 1.0,
-            bookmaker: row[bookmakerIndex],
-            commence: parseDate(row[commenceIndex]),
-            status: row[statusIndex],
-            lastUpdated: new Date()
-          });
-
-          console.log(`📊 Processing match: ${homeTeam.trim()} vs ${awayTeam.trim()} with first bookmaker: ${row[bookmakerIndex]}`);
-        } else {
-          console.log(`⏭️ Skipping duplicate match: ${homeTeam.trim()} vs ${awayTeam.trim()} from bookmaker: ${row[bookmakerIndex]}`);
-        }
+        console.log(`📊 Processing odds: ${homeTeam.trim()} vs ${awayTeam.trim()} from ${row[bookmakerIndex]}`);
       }
     }
     
-    console.log(`✅ Successfully processed odds for ${oddsData.length} unique matches`);
+    console.log(`✅ Successfully processed odds for ${oddsData.length} entries`);
     if (oddsData.length > 0) {
-      console.log(`📊 Sample match: ${oddsData[0].homeTeam} vs ${oddsData[0].awayTeam}, Odds: ${oddsData[0].homeOdds}-${oddsData[0].awayOdds}`);
+      console.log(`📊 Sample odds: ${oddsData[0].homeTeam} vs ${oddsData[0].awayTeam}, Odds: ${oddsData[0].homeOdds}-${oddsData[0].awayOdds} from ${oddsData[0].bookmaker}`);
     }
     
     return oddsData;

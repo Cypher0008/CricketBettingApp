@@ -12,34 +12,29 @@ const router = express.Router();
 // ✅ Route to Fetch Only Live Matches with Odds
 router.get("/matches/live", async (req, res) => {
     try {
-        console.log(`🟡 [ROUTE HIT] Fetching live matches with odds`);
+        console.log('🟡 [ROUTE HIT] Fetching live matches with odds');
         
-        // Get all matches with DraftKings odds
-        const oddsEntries = await Odds.find({ bookmaker: 'DraftKings' });
-        console.log(`📊 Found ${oddsEntries.length} DraftKings odds entries`);
+        // Instead, get all odds (which should now be one per match)
+        const odds = await Odds.find();
         
-        if (oddsEntries.length === 0) {
-            console.log('⚠️ No DraftKings odds available');
-            return res.json([]);
-        }
-        
-        const matchesWithOdds = oddsEntries.map(odds => ({
-            id: odds.matchId,
-            home_team: odds.homeTeam,
-            away_team: odds.awayTeam,
-            league: "Cricket League",
-            venue: "TBD",
-            scheduled: odds.commence || new Date().toISOString(),
-            status: odds.status || "not_started",
-            home_odds: odds.homeOdds,
-            away_odds: odds.awayOdds,
-            bookmaker: odds.bookmaker
+        // Map to the format expected by the frontend
+        const matches = odds.map(odd => ({
+            id: odd.matchId,
+            home_team: odd.homeTeam,
+            away_team: odd.awayTeam,
+            home_odds: odd.homeOdds,
+            away_odds: odd.awayOdds,
+            bookmaker: odd.bookmaker,
+            scheduled: odd.commence,
+            status: odd.status,
+            lastUpdated: odd.lastUpdated
         }));
         
-        res.json(matchesWithOdds);
+        console.log(`📊 Found ${matches.length} matches with odds`);
+        res.json(matches);
     } catch (error) {
-        console.error("❌ [ROUTE ERROR]:", error);
-        res.status(500).json({ error: "Failed to fetch matches" });
+        console.error('❌ Error fetching live matches:', error);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
@@ -356,43 +351,32 @@ router.get("/betting/:matchId", async (req, res) => {
     
     console.log(`🟡 [ROUTE HIT] Fetching betting details for ID: ${matchId}, preferred bookmaker: ${bookmaker}`);
     
-    // Try to find odds with preferred bookmaker first
-    let matchFromOdds = await Odds.findOne({ 
-      matchId,
-      bookmaker: bookmaker 
+    // Instead, just get the odds for this match (should be only one entry)
+    const odds = await Odds.findOne({ matchId });
+    
+    if (!odds) {
+      return res.status(404).json({ error: 'Match odds not found' });
+    }
+    
+    // Get the match details
+    const match = await Match.findOne({ matchId });
+    
+    // Return combined data
+    res.json({
+      id: odds.matchId,
+      home_team: odds.homeTeam,
+      away_team: odds.awayTeam,
+      home_odds: odds.homeOdds,
+      away_odds: odds.awayOdds,
+      bookmaker: odds.bookmaker,
+      scheduled: odds.commence,
+      status: odds.status || match?.status,
+      venue: match?.venue || 'TBD',
+      lastUpdated: odds.lastUpdated
     });
-    
-    // If not found, get any available odds for this match
-    if (!matchFromOdds) {
-      console.log(`⚠️ No odds found for bookmaker ${bookmaker}, trying alternatives`);
-      matchFromOdds = await Odds.findOne({ matchId }).sort({ lastUpdated: -1 });
-    }
-    
-    if (!matchFromOdds) {
-      return res.status(404).json({ 
-        error: "Match not found",
-        searchedId: matchId
-      });
-    }
-    
-    const matchDetails = {
-      id: matchFromOdds.matchId,
-      home_team: matchFromOdds.homeTeam,
-      away_team: matchFromOdds.awayTeam,
-      league: "Cricket League",
-      venue: "TBD",
-      scheduled: matchFromOdds.commence || new Date().toISOString(),
-      status: matchFromOdds.status || "not_started",
-      home_odds: parseFloat(matchFromOdds.homeOdds).toFixed(2),
-      away_odds: parseFloat(matchFromOdds.awayOdds).toFixed(2),
-      bookmaker: matchFromOdds.bookmaker
-    };
-    
-    console.log("✅ [ROUTE SUCCESS] Betting details sent:", matchDetails);
-    res.json(matchDetails);
   } catch (error) {
-    console.error("❌ [ROUTE ERROR]:", error);
-    res.status(500).json({ error: "Failed to retrieve betting details" });
+    console.error('❌ Error fetching match odds:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -400,15 +384,18 @@ router.get('/live', async (req, res) => {
   try {
     const matches = await Match.find().sort({ scheduled: 1 });
     const matchesWithOdds = await Promise.all(matches.map(async (match) => {
-      const odds = await Odds.findOne({ 
-        matchId: match.matchId,
-        bookmaker: 'DraftKings'  // Prefer DraftKings odds
+      // Get all odds for this match, sorted by lastUpdated
+      const allOdds = await Odds.find({ 
+        matchId: match.matchId
       }).sort({ lastUpdated: -1 });
 
-      if (!odds) {
+      if (!allOdds || allOdds.length === 0) {
         console.log(`No odds found for match: ${match.matchId}`);
         return null;
       }
+
+      // Just use the first available odds (most recently updated)
+      const odds = allOdds[0];
 
       return {
         id: match.matchId,
@@ -424,7 +411,7 @@ router.get('/live', async (req, res) => {
 
     // Filter out matches without odds
     const validMatches = matchesWithOdds.filter(match => match !== null);
-    console.log(`📊 Found ${validMatches.length} DraftKings odds entries`);
+    console.log(`📊 Found ${validMatches.length} matches with odds`);
     res.json(validMatches);
   } catch (error) {
     console.error('Error fetching live matches:', error);

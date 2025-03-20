@@ -102,14 +102,29 @@ const BettingPage = () => {
 
     // Subscribe to odds updates
     const unsubscribe = wsService.subscribe((newOdds) => {
-      const updatedOdds = newOdds.find(odds => odds.matchId === matchId);
-      if (updatedOdds && matchDetails) {
-        setMatchDetails(prev => ({
-          ...prev,
-          home_odds: updatedOdds.homeOdds,
-          away_odds: updatedOdds.awayOdds
-        }));
-        setLastUpdate(new Date());
+      console.log('Received WebSocket update:', newOdds);
+      
+      if (matchId && matchDetails) {
+        // First decode the matchId from the URL
+        const decodedMatchId = matchId.replace(/___/g, '/');
+        
+        // Find the odds for this specific match
+        const updatedOdds = newOdds.find(odds => {
+          // Compare with the decoded matchId
+          return odds.matchId === decodedMatchId;
+        });
+        
+        if (updatedOdds) {
+          console.log('Found updated odds for this match:', updatedOdds);
+          setMatchDetails(prev => ({
+            ...prev,
+            home_odds: updatedOdds.homeOdds,
+            away_odds: updatedOdds.awayOdds,
+            bookmaker: updatedOdds.bookmaker,
+            lastUpdated: new Date()
+          }));
+          setLastUpdate(new Date());
+        }
       }
     });
 

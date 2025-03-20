@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const oddsSchema = new mongoose.Schema({
   matchId: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   homeTeam: {
     type: String,
@@ -39,8 +40,8 @@ const oddsSchema = new mongoose.Schema({
   }
 });
 
-// Create a compound index for matchId and bookmaker
-oddsSchema.index({ matchId: 1, bookmaker: 1 }, { unique: true });
+// Remove the compound index and create a simple index on matchId
+oddsSchema.index({ matchId: 1 }, { unique: true });
 
 const Odds = mongoose.model('Odds', oddsSchema);
 

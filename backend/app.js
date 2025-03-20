@@ -25,11 +25,20 @@ wss.on('connection', (ws) => {
 
 // Function to broadcast odds updates to all connected clients
 const broadcastOddsUpdate = (odds) => {
+  const oddsData = odds.map(odd => ({
+    matchId: odd.matchId,
+    homeTeam: odd.homeTeam,
+    awayTeam: odd.awayTeam,
+    homeOdds: odd.homeOdds,
+    awayOdds: odd.awayOdds,
+    bookmaker: odd.bookmaker
+  }));
+  
   clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({
         type: 'ODDS_UPDATE',
-        data: odds
+        data: oddsData
       }));
     }
   });

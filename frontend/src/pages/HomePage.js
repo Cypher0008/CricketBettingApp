@@ -41,13 +41,16 @@ const HomePage = () => {
       setLoading(true);
       setError(null);
       const data = await getLiveMatches();
-      setMatches(data);
+      // Ensure we're getting fresh data by completely replacing the state
+      setMatches(data || []);
       setLastUpdate(new Date());
       setLoading(false);
     } catch (error) {
       console.error('Error fetching matches:', error);
       setError('Failed to load matches');
       setLoading(false);
+      // Clear matches on error to prevent showing stale data
+      setMatches([]);
     }
   };
 
@@ -61,25 +64,37 @@ const HomePage = () => {
     // Subscribe to updates
     const unsubscribe = wsService.subscribe((updatedOdds) => {
       setMatches(prevMatches => {
-        return prevMatches.map(match => {
-          const updatedOdd = updatedOdds.find(odd => odd.matchId === match.id);
-          if (updatedOdd) {
-            return {
-              ...match,
-              home_odds: updatedOdd.homeOdds,
-              away_odds: updatedOdd.awayOdds,
-              lastUpdate: new Date()
-            };
-          }
-          return match;
-        });
+        // Create a new array with only matches that exist in the updated odds
+        const updatedMatches = prevMatches
+          .map(match => {
+            const updatedOdd = updatedOdds.find(odd => odd.matchId === match.id);
+            if (updatedOdd) {
+              return {
+                ...match,
+                home_odds: updatedOdd.homeOdds,
+                away_odds: updatedOdd.awayOdds,
+                bookmaker: updatedOdd.bookmaker,
+                lastUpdated: new Date()
+              };
+            }
+            return null; // Return null for matches that no longer exist
+          })
+          .filter(match => match !== null); // Remove null entries
+
+        return updatedMatches;
       });
       setLastUpdate(new Date());
     });
 
+    // Set up periodic refresh
+    const refreshInterval = setInterval(() => {
+      fetchMatches();
+    }, 30000); // Refresh every 30 seconds
+
     // Cleanup
     return () => {
       unsubscribe();
+      clearInterval(refreshInterval);
     };
   }, []);
 
