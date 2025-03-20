@@ -9,7 +9,7 @@ const SHEET_NAME = 'Sheet1'; // Update this if your sheet has a different name
 // Initialize auth client
 async function getAuthClient() {
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+    keyFile: './credentials.json',
     scopes: SCOPES,
   });
   return auth.getClient();
@@ -152,4 +152,4 @@ async function fetchOddsFromSheet() {
 
 module.exports = {
   fetchOddsFromSheet
-}; 
+};
