@@ -46,10 +46,9 @@ const initOddsCronJob = (broadcastCallback) => {
           const matchId = `match_${odds.homeTeam.replace(/[^a-zA-Z0-9]/g, '')}_${odds.awayTeam.replace(/[^a-zA-Z0-9]/g, '')}`;
           odds.matchId = matchId;
           
-          // Add a small random variation to odds for testing
-          const randomVariation = Math.random() * 0.1 - 0.05; // -0.05 to +0.05
-          odds.homeOdds = parseFloat(odds.homeOdds) + randomVariation;
-          odds.awayOdds = parseFloat(odds.awayOdds) + randomVariation;
+          // Use exact values from sheets
+          odds.homeOdds = parseFloat(odds.homeOdds);
+          odds.awayOdds = parseFloat(odds.awayOdds);
           
           // Create or update match entry
           let match = await Match.findOne({ matchId });
